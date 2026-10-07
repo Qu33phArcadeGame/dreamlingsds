@@ -1,0 +1,26 @@
+name: Build DS Test
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: skylyrac/blocksds:slim-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build test.nds
+        run: |
+          RULES="$BLOCKSDS/sys/default_makefiles/rom_arm9/Makefile"
+          printf '%s\n' \
+            'NAME          := test' \
+            'GAME_TITLE    := DS Test' \
+            'GAME_SUBTITLE := Red Blue Test' \
+            'GAME_AUTHOR   := Coby' \
+            'SOURCEDIRS    := source' \
+            "include $RULES" > Makefile
+          make
+          ls -la *.nds
+      - uses: actions/upload-artifact@v4
+        with:
+          name: test-nds
+          path: "*.nds"
