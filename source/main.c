@@ -330,7 +330,7 @@ int main(void) {
         }
         
         // DMA copy RAM buffer to VRAM (like qu33ph)
-        dmaCopyWordsAsynch(3, drawBuf, vramReal, 256*192*2);
+        dmaCopyWords(3, drawBuf, vramReal, 256*192*2);
         swiWaitForVBlank();
     }
     return 0;
