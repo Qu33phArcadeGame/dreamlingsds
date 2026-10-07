@@ -224,8 +224,9 @@ int main(void) {
     int bgMain = bgInit(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
     int bgSub = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
     vramReal = bgGetGfxPtr(bgMain);
-    vramTop = drawBuf;  // Draw to RAM buffer, DMA copy to VRAM each frame
-    // Use top screen for game (main engine is top by default)
+    vramTop = drawBuf;
+    // Enable VBlank IRQ (async DMA may need interrupts enabled)
+    irqEnable(IRQ_VBLANK);
     
     int slot_reels[3] = {0,0,0};
     int slot_spinning = 0;
