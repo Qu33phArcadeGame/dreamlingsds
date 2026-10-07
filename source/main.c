@@ -8,8 +8,10 @@
 #include "cnn.h"
 #include "dreamlings.h"
 
-// Framebuffers (16-bit bitmap BGs, like qu33ph)
-static u16 *vramTop;
+// Framebuffers: draw to RAM buffer, DMA copy to VRAM (like qu33ph)
+static u16 drawBuf[256*192] __attribute__((aligned(32)));
+static u16 *vramTop;  // points to drawBuf for drawing
+static u16 *vramReal; // actual VRAM from bgGetGfxPtr
 
 
 #define RGB(r,g,b) ((r)|((g)<<5)|((b)<<10))
@@ -221,7 +223,8 @@ int main(void) {
     vramSetBankC(VRAM_C_SUB_BG);
     int bgMain = bgInit(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
     int bgSub = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
-    vramTop = bgGetGfxPtr(bgMain);
+    vramReal = bgGetGfxPtr(bgMain);
+    vramTop = drawBuf;  // Draw to RAM buffer, DMA copy to VRAM each frame
     // Use top screen for game (main engine is top by default)
     
     int slot_reels[3] = {0,0,0};
@@ -325,6 +328,8 @@ int main(void) {
             if (pressed & KEY_B) state = ST_WORLD;
         }
         
+        // DMA copy RAM buffer to VRAM (like qu33ph)
+        dmaCopyWordsAsynch(3, drawBuf, vramReal, 256*192*2);
         swiWaitForVBlank();
     }
     return 0;
