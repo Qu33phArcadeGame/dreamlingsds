@@ -330,6 +330,8 @@ int main(void) {
         }
         
         // DMA copy RAM buffer to VRAM (like qu33ph)
+        // Flush data cache so DMA sees the CPU-written pixels
+        DC_FlushRange(drawBuf, 256*192*2);
         dmaCopyWords(3, drawBuf, vramReal, 256*192*2);
         swiWaitForVBlank();
     }
