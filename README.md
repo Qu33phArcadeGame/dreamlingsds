@@ -32,13 +32,13 @@ network runs on the DS's own ARM9 CPU.
 Walk into the purple building with the eye. Your newest card pops up: the
 creature in front of its dream photo, in the card frame.
 
-* **Book mode** (default): turn the DS sideways like a book. The card fills
-  one screen and the touch screen has the controls. You can switch to
-  **Upright** or left-handed in Settings.
-* **Dream this card** runs a starting dream at 3 sizes, then **Zoom** falls
-  into the card along a straight, square or triangle path.
+* **Upright** (default): card on the top screen, controls on the touch screen.
+  Tap **Rotate** (or press **R**) for **Book mode**: hold the DS sideways like
+  a book and the card fills a whole screen. Left-handed book mode is in Settings.
+* **Zoom** falls into the card along a straight, square or triangle path,
+  dreaming as it goes. The first frame is the plain card (no starting dream).
 * Settings has the same knobs as the website: zoom factor, steps per frame,
-  learning rate, movement range, frames per side, starting steps, keep sharp,
+  learning rate, movement range, frames per side, keep sharp,
   layers (lo / mid / hi), focus (one branch of the Inception block) and
   dream size (40x50 fast, 80x100 detailed). Presets are tuned for the DS.
 * Playback is a zoomerang (in, then back out) with separate in / out speeds.
