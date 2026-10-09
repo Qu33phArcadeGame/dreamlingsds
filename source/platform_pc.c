@@ -121,6 +121,7 @@ u32 plat_keys_down(void) { return kdown; }
 u32 plat_keys_held(void) { return kheld; }
 u32 plat_keys_up(void) { return kup; }
 void plat_touch(int *x, int *y) { *x = tx; *y = ty; }
+u32 plat_vblanks(void) { return (u32)frame; }
 u32 plat_ms(void) {
     return (u32)(frame * 1000 / 60) + compute_ms;
 }

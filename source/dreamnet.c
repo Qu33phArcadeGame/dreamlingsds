@@ -19,6 +19,29 @@ static s32 gacc2[MAXPIX * 4];       // conv2 output (16 ch at 1/4 size) or the i
 
 static inline int osz(int n, int s) { return s == 2 ? (n + 1) >> 1 : n; }   // stride 1 or 2
 
+// ------------------------------------------------------------------ fast weights
+// The ARM9's data cache is only 4 KB, so a layer whose weights are bigger than
+// that (conv3: 6.9 KB) misses the cache on every pixel. Copying the layer's
+// weights into DTCM (16 KB of single-cycle memory next to the CPU) first makes
+// every weight read cheap. Layers too big for it (conv4/5) stay in main RAM.
+#if !defined(PC_BUILD) && defined(DTCM_BSS)
+#define FASTMEM DTCM_BSS
+#else
+#define FASTMEM
+#endif
+#define FAST_W 3456   // s16 values: conv3's 24 x 144 weights
+static s16 FASTMEM __attribute__((aligned(4))) wfast[FAST_W];
+static DNConv fast_layer(const DNConv *L, bool backward) {
+    DNConv c = *L;
+    int n = backward ? 9 * L->cin * L->cout : L->cout * L->kp;
+    if (n <= FAST_W) {
+        memcpy(wfast, backward ? L->wt : L->w, (u32)n * sizeof(s16));
+        if (backward) c.wt = wfast;
+        else c.w = wfast;
+    }
+    return c;
+}
+
 // ------------------------------------------------------------------ dot products
 // Two 16-bit values per 32-bit load; compilers turn each line of MAC2 into the
 // ARM9's single-cycle SMLABB / SMLATT multiply-accumulates.
@@ -181,7 +204,8 @@ void dn_step(const DNModel *m, s16 *img, int H, int W, int lr_q12, DNObjective o
         if (obj.layers & (1 << h)) deepest = MAX(deepest, m->head_src[h]);
     for (int l = 0; l <= deepest; l++) {
         const DNConv *L = &m->conv[l];
-        conv_fwd(ACT[l], hs[l], ws[l], L, ACT[l + 1]);
+        DNConv F = fast_layer(L, false);
+        conv_fwd(ACT[l], hs[l], ws[l], &F, ACT[l + 1]);
         hs[l + 1] = osz(hs[l], L->stride);
         ws[l + 1] = osz(ws[l], L->stride);
     }
@@ -244,7 +268,8 @@ void dn_step(const DNModel *m, s16 *img, int H, int W, int lr_q12, DNObjective o
         s16 *gz = ACT[l + 1];
         int r = mask_and_scale(G, ACT[l + 1], gz, n);
         const int nin = hs[l] * ws[l] * L->cin;
-        conv_bwd(gz, hs[l], ws[l], L, Gnext);
+        DNConv B = fast_layer(L, true);
+        conv_bwd(gz, hs[l], ws[l], &B, Gnext);
         e = e - r + L->qw;
         // keep the exponent in a sane range for the next seed alignment
         u32 mx = 0;

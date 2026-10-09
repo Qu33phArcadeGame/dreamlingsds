@@ -89,6 +89,7 @@ void plat_touch(int *x, int *y) {
     *x = t.px;
     *y = t.py;
 }
+u32 plat_vblanks(void) { return vblanks; }
 u32 plat_ms(void) { return (u32)((u64)vblanks * 1000 / 60); }
 bool plat_is_dsi(void) { return isDSiMode(); }
 const char *plat_cpu_label(void) { return dsi_fast ? "DSi (134 MHz)" : (isDSiMode() ? "DSi" : "DS (67 MHz)"); }

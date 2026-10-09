@@ -243,7 +243,46 @@ static DNObjective objective(u8 layers, u8 groups) {
     return o;
 }
 
+// ---------------------------------------------------------------- floating dreams
+// When you're done with a dream (leave the building, switch cards, load another),
+// it floats out of the door into town as the creature's outline with the dream inside.
+static bool floated;   // this dream is already out in town
+static bool release_dream(void) {
+    if (floated || nframes < 2 || !seed.kind) return false;
+    const Area *A = area_for_map(G.map);
+    int x = A->gen_x >= 0 ? A->gen_x * TILE_SIZE + TILE_SIZE * 3 / 2 : 64;
+    int y = A->gen_y >= 0 ? A->gen_y * TILE_SIZE + TILE_SIZE * 2 + 6 : 64;
+    int s = floater_begin(G.map, &seed, x, y);
+    // 8 frames spread over the dream (frame 0 is the plain card, so skip it)
+    for (int k = 0; k < 8; k++) {
+        int fi = 1 + (nframes - 2) * k / 7;
+        if (k && fi == 1 + (nframes - 2) * (k - 1) / 7) continue;   // short dream: no repeats
+        floater_frame(s, frame_ptr(fi), W, H);
+    }
+    floater_end(s);
+    floated = true;
+    return true;
+}
+static void leave_generator(void) {
+    char nm[32];
+    pick_name(&seed, nm);
+    bool out = release_dream();
+    save_write();
+    ui_set_touch_xform(0);
+    set_mode(MODE_WORLD);
+    world_resume();
+    if (out) {
+        char m[96];
+        strcpy(m, "Your dream of ");
+        strcat(m, nm);
+        strcat(m, " floated out into town!");
+        world_say(m);
+    }
+}
+
 static void set_seed(const Pick *p) {
+    release_dream();
+    floated = false;
     seed = *p;
     W = S()->detail ? 80 : 40;
     H = S()->detail ? 100 : 50;
@@ -498,6 +537,8 @@ static bool keep_card(void) {
 }
 
 static bool load_card(int gi) {
+    release_dream();
+    floated = false;
     char path[40];
     card_file(path, gallery[gi].no);
     static CardHeader hd;
@@ -606,6 +647,7 @@ void generator_open(int area_model) {
     page = P_MAIN;
     work = W_IDLE;
     progress = -1;
+    floated = true;   // whatever was left from last time already floated out
     Pick p;
     if (pick_count() > 0) pick_at(0, &p);
     else {
@@ -823,10 +865,7 @@ static void main_page(void) {
         else strcpy(status, "Couldn't write the GIF to the SD card.");
     }
     if (ui_button(s, (Rect){(s16)(14 + 2 * bw), (s16)y, (s16)bw, (s16)h2}, "Town", COL(9, 7, 14), !busy)) {
-        save_write();
-        ui_set_touch_xform(0);
-        set_mode(MODE_WORLD);
-        world_resume();
+        leave_generator();
         return;
     }
     y += h2 + 6;
@@ -999,10 +1038,7 @@ void generator_update(void) {
             else { if (!nframes) start_dream(); start_zoom(); }
         }
         if ((down & K_B) && work == W_IDLE) {
-            save_write();
-            ui_set_touch_xform(0);
-            set_mode(MODE_WORLD);
-            world_resume();
+            leave_generator();
             return;
         }
         if ((down & K_SELECT) && work == W_IDLE) page = P_SETTINGS;

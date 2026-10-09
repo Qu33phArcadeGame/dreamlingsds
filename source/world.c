@@ -8,7 +8,9 @@ static const MapDef *M;
 static int cur_map;
 static int pxl, pyl;            // player position in pixels (top-left of tile)
 static int tx, ty;              // player tile
-static int move_dx, move_dy, move_left; // current step
+static int move_dx, move_dy, move_left; // current step (move_left: pixels to go)
+static int move_q8, move_sx, move_sy;   // progress of the step (Q8 pixels) and where it started
+static u32 last_vb;                     // screen refreshes seen by the last update
 static int face;                // 0 F(down) 1 B(up) 2 L 3 R
 static bool in_zone;
 static u32 last_step_frame;
@@ -152,6 +154,9 @@ static void try_step(int dx, int dy) {
     move_dx = dx;
     move_dy = dy;
     move_left = T;
+    move_q8 = 0;
+    move_sx = pxl;
+    move_sy = pyl;
     tx = nx;
     ty = ny;
     last_step_frame = frame_no;
@@ -362,6 +367,7 @@ static void draw_world(void) {
     static const int FACE_FRAME[4] = {0, 1, 2, 3};
     draw_person(s, hero_pixels + FACE_FRAME[face] * HERO_W * HERO_H, pxs, pys);
     draw_companion(s, pcx, pcy, true);
+    floaters_draw(s, cur_map, camx, camy, mapw, maph, pcx, pcy);
     update_particles(camx, camy, c0, r0, c1, r1);
     draw_particles(s, camx, camy);
     // HUD
@@ -416,7 +422,13 @@ static void draw_menu(void) {
         say(plat_fs_ok() ? "Saved to the SD card." : "No SD card found, so the game can't save.", 0);
     }
     s_text(s, "D-pad walk   B (hold) run   A talk", 12, 140, COL(20, 18, 26), 1);
-    s_text(s, "Walk into water to meet dreamlings.", 12, 152, COL(20, 18, 26), 1);
+    int nd = floaters_in_town(cur_map);
+    if (nd) {
+        char fl[40] = "Dreams floating here: ";
+        char c[4] = {(char)('0' + nd), 0, 0, 0};
+        strcat(fl, c);
+        s_text(s, fl, 12, 152, COL8(255, 224, 138), 1);
+    } else s_text(s, "Walk into water to meet dreamlings.", 12, 152, COL(20, 18, 26), 1);
     s_text(s, "START binder   SELECT save", 12, 164, COL(20, 18, 26), 1);
     if (save_dirty && plat_fs_ok() && (frame_no % 1800) == 0) { remember_pos(); save_write(); }
 }
@@ -459,17 +471,24 @@ void world_update(void) {
             }
         }
         if (move_left > 0) {
-            int sp = (held & K_B) ? 4 : 2;
-            sp = MIN(sp, move_left);
-            pxl += move_dx * sp;
-            pyl += move_dy * sp;
-            move_left -= sp;
+            // speed is per screen refresh, so walking stays quick even when a
+            // busy frame takes two refreshes to draw
+            u32 vb = plat_vblanks();
+            int ticks = CLAMP((int)(vb - last_vb), 1, 4);
+            int sp_q8 = (held & K_B) ? 5 * 256 : 3 * 256;   // pixels per refresh: walk 3, run 5
+            move_q8 = MIN(move_q8 + sp_q8 * ticks, T * 256);
+            int done = move_q8 >> 8;
+            pxl = move_sx + move_dx * done;
+            pyl = move_sy + move_dy * done;
+            move_left = T - done;
             if (move_left == 0) finish_step();
         }
     }
+    last_vb = plat_vblanks();
     if (game_mode != MODE_WORLD) return;
     draw_world();
-    draw_menu();
+    // the touch screen only needs redrawing every other frame (or when touched)
+    if (!(frame_no & 1) || touch_down || touch_held) draw_menu();
 }
 
 void world_say(const char *t) { say(t, 0); }

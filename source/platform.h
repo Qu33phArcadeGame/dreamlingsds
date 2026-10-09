@@ -22,6 +22,7 @@ u32 plat_keys_up(void);
 // touch position on the bottom screen (valid while K_TOUCH is held)
 void plat_touch(int *x, int *y);
 u32 plat_ms(void);          // milliseconds since boot
+u32 plat_vblanks(void);     // 60 Hz screen refreshes since boot
 bool plat_is_dsi(void);
 const char *plat_cpu_label(void);
 bool plat_running(void);    // false = quit (PC build only)

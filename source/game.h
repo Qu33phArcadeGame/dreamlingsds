@@ -119,6 +119,13 @@ void binder_update(void);
 void generator_open(int area_model);
 void generator_update(void);
 
+// ---------------------------------------------------------------- floating dreams (RAM only)
+int floater_begin(int map, const Pick *p, int x, int y);   // returns the slot
+void floater_frame(int slot, const u16 *frame, int w, int h);
+void floater_end(int slot);
+int floaters_in_town(int map);
+void floaters_draw(Surf *s, int map, int camx, int camy, int map_w, int map_h, int pcx, int pcy);
+
 // ---------------------------------------------------------------- UI helpers (bottom screen)
 typedef struct { s16 x, y, w, h; } Rect;
 bool ui_button(Surf *s, Rect r, const char *label, u16 fill, bool enabled); // draws; returns tapped
