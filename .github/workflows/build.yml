@@ -13,15 +13,6 @@ jobs:
 
       - name: Build dreamlings.nds
         run: |
-          RULES="$BLOCKSDS/sys/default_makefiles/rom_arm9/Makefile"
-          printf '%s\n' \
-            'NAME          := dreamlings' \
-            'GAME_TITLE    := Deepdreamlings DS' \
-            'GAME_SUBTITLE := Real neural dreaming' \
-            'GAME_AUTHOR   := Coby' \
-            'SOURCEDIRS    := source' \
-            "include $RULES" > Makefile
-          cat Makefile
           make
           ls -la *.nds
 
