@@ -7,12 +7,26 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: skylyrac/blocksds:slim-latest
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install BlocksDS
+        run: |
+          sudo mkdir -p /opt/wonderful
+          sudo chown -R "$USER" /opt/wonderful
+          curl -fL --retry 5 -o /tmp/wf.tar.gz https://wonderful.asie.pl/bootstrap/wf-bootstrap-x86_64.tar.gz
+          tar xzf /tmp/wf.tar.gz -C /opt/wonderful
+          export PATH=/opt/wonderful/bin:$PATH
+          wf-pacman -Syu --noconfirm wf-tools
+          wf-config repo enable blocksds
+          wf-pacman -Syu --noconfirm
+          wf-pacman -S --noconfirm blocksds-toolchain
+
       - name: Build dreamlings.nds
         run: |
+          export PATH=/opt/wonderful/bin:$PATH
+          export BLOCKSDS=/opt/wonderful/thirdparty/blocksds/core
+          export BLOCKSDSEXT=/opt/wonderful/thirdparty/blocksds/external
           make
           ls -la *.nds
 
