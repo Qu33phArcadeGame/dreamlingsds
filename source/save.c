@@ -28,7 +28,7 @@ void save_defaults(void) {
     s->play_fps = 12;
     s->play_fps_out = 12;
     s->boomerang = 1;
-    s->book = 1;
+    s->book = 0;   // upright; Rotate in the generator switches to book mode
     s->left_handed = 0;
 }
 

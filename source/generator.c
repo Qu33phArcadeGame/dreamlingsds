@@ -221,7 +221,7 @@ static void card_info(CardInfo *ci, int frame_idx) {
         strcat(ci->bullets[1], ", LAYERS ");
         strcat(ci->bullets[1], ls);
     } else {
-        strcpy(ci->bullets[0], "STARTING CARD, NO STARTING DREAM");
+        strcpy(ci->bullets[0], "STARTING CARD");
         ci->bullets[1][0] = 0;
     }
     if (recipe.nruns) {
@@ -279,14 +279,14 @@ static void push_frame(void) {
     dirty = true;
 }
 
+// begin a new card: the undreamed card art is frame 1 (the dreaming happens while zooming)
 static void start_dream(void) {
     if (!seed.kind) return;
     G.card_no++;
     card_no = G.card_no;
     save_dirty = true;
     dn_from_rgb15(seed_art, cur, W * H);
-    dn_add_noise(cur, W * H, 120);
-    recipe.start_steps = S()->start_steps;
+    recipe.start_steps = 0;   // no starting dream: the plain card is frame 1
     recipe.start_layers = S()->layers;
     recipe.start_groups = S()->groups;
     recipe.start_lr = S()->lr;
@@ -295,19 +295,8 @@ static void start_dream(void) {
     have_cur = true;
     start_oct = 2;
     start_i = 0;
-    if (!S()->start_steps) {
-        push_frame();
-        work = W_IDLE;
-        strcpy(status, "Ready. Press Zoom to fall into the card.");
-        return;
-    }
-    // first octave: shrink
-    oct_h = MAX(16, (H * 1000 / 1823 + 1));   // 1.35^2 = 1.8225
-    oct_w = MAX(16, (W * 1000 / 1823 + 1));
-    dn_resize(cur, H, W, tmpimg, oct_h, oct_w);
-    memcpy(cur, tmpimg, oct_h * oct_w * 3 * sizeof(s16));
-    work = W_START;
-    stop_req = false;
+    push_frame();
+    work = W_IDLE;
 }
 
 static void start_work_step(void) {
@@ -631,9 +620,9 @@ void generator_open(int area_model) {
     char nm[32];
     pick_name(&seed, nm);
     strcpy(status, nm);
-    strcat(status, " popped out of your collection. Press Dream!");
+    strcat(status, " popped out of your collection. Press Zoom!");
     if (S()->book && !G.gen.pad_hint_seen) {
-        strcpy(status, "Turn your DS sideways like a book! (Settings > View for upright.)");
+        strcpy(status, "Book mode: hold your DS sideways. Tap Rotate (or press R) to switch back.");
         G.gen.pad_hint_seen = 1;
     }
     if (!pool) strcpy(status, "Not enough memory for dream frames on this console.");
@@ -642,9 +631,9 @@ void generator_open(int area_model) {
 }
 
 // ---------------------------------------------------------------- settings rows
-enum { R_PRESET, R_PATH, R_FRAMES, R_ZOOM, R_STEPS, R_LR, R_RANGE, R_SEG, R_START, R_SHARP, R_LAYERS, R_FOCUS, R_SIZE, R_VIEW, R_HAND, R_COUNT };
+enum { R_PRESET, R_PATH, R_FRAMES, R_ZOOM, R_STEPS, R_LR, R_RANGE, R_SEG, R_SHARP, R_LAYERS, R_FOCUS, R_SIZE, R_VIEW, R_HAND, R_COUNT };
 static const char *const ROW_LABEL[R_COUNT] = {"Preset", "Zoom path", "Frames/run", "Zoom factor", "Steps/frame", "Learning rate", "Move range",
-                                               "Frames/side", "Start steps", "Keep sharp", "Layers", "Focus", "Dream size", "View", "Hand"};
+                                               "Frames/side", "Keep sharp", "Layers", "Focus", "Dream size", "View", "Hand"};
 
 static void row_value(int r, char *o) {
     const GenSettings *s = S();
@@ -657,7 +646,6 @@ static void row_value(int r, char *o) {
     case R_LR: fx_str(o, s->lr, 1000, 3); break;
     case R_RANGE: fx_str(o, s->range, 1000, 3); break;
     case R_SEG: num_str(o, s->seg); break;
-    case R_START: num_str(o, s->start_steps); break;
     case R_SHARP: fx_str(o, s->sharpen, 100, 2); break;
     case R_LAYERS: {
         o[0] = 0;
@@ -697,7 +685,6 @@ static void row_change(int r, int d) {
     case R_LR: s->lr = (u16)CLAMP(s->lr + d * (s->lr >= 20 ? 5 : 1), 1, 200); break;
     case R_RANGE: s->range = (u8)CLAMP(s->range + d * 10, 0, 250); break;
     case R_SEG: s->seg = (u8)CLAMP(s->seg + d, 1, 60); break;
-    case R_START: s->start_steps = (u8)CLAMP(s->start_steps + d, 0, 30); break;
     case R_SHARP: s->sharpen = (u8)CLAMP(s->sharpen + d * 5, 0, 100); break;
     case R_LAYERS: s->layers = (u8)(((s->layers - 1 + d + 7) % 7) + 1); break;  // cycles lo, mid, lo+mid, hi, ...
     case R_FOCUS: {
@@ -758,6 +745,16 @@ static void draw_top(void) {
     }
 }
 
+static bool rotate_req;   // applied at the start of the next update, between layouts
+static void toggle_view(void) {
+    G.gen.book ^= 1;
+    save_dirty = true;
+    strcpy(status, G.gen.book ? "Book mode: hold your DS sideways. Tap Rotate (or press R) to switch back." : "Upright view. Tap Rotate (or press R) for book mode.");
+    // wipe both screens so nothing from the old layout lingers
+    s_fill(&S_TOP, COL(2, 1, 4));
+    s_fill(&S_BOT, COL(2, 1, 4));
+}
+
 static Surf panel;
 static void panel_begin(void) {
     if (S()->book) { panel = (Surf){portrait, 192, 256}; ui_set_touch_xform(S()->left_handed ? 2 : 1); }
@@ -790,6 +787,7 @@ static void main_page(void) {
     bool compact = s->h < 220;
     draw_bg_pattern(s, (int)frame_no, COL(2, 1, 5), COL(5, 2, 10));
     s_text_sh(s, "Dream Generator", 6, 4, COL8(201, 160, 255), 1);
+    if (ui_button(s, (Rect){(s16)(pw - 56), 2, 52, 13}, "Rotate", COL8(255, 224, 138), true)) rotate_req = true;
     char m[40];
     strcpy(m, area_for_map(G.map)->name);
     strcat(m, " / ");
@@ -801,14 +799,13 @@ static void main_page(void) {
     int y = 56;
     int bh = compact ? 26 : 32;
     bool busy = work != W_IDLE;
-    const char *primary = busy ? "Stop" : (!nframes ? "Dream this card" : (nframes >= max_frames() ? "Card is full" : "Zoom!"));
+    const char *primary = busy ? "Stop" : (nframes >= max_frames() ? "Card is full" : "Zoom!");
     char zl[32];
-    if (!busy && nframes && nframes < max_frames()) { strcpy(zl, "Zoom ("); strcat(zl, PATH_NAME[S()->path]); strcat(zl, ")"); primary = zl; }
+    if (!busy && nframes < max_frames()) { strcpy(zl, "Zoom ("); strcat(zl, PATH_NAME[S()->path]); strcat(zl, ")"); primary = zl; }
     if (ui_button(s, (Rect){6, (s16)y, (s16)(pw - 12), (s16)bh}, primary, busy ? COL8(255, 143, 191) : COL8(138, 255, 234),
                   busy || (seed.kind && nframes < max_frames()))) {
         if (busy) { stop_req = true; if (work == W_START) work = W_IDLE; strcpy(status, "Stopped."); progress = -1; if (nframes == 0 && have_cur) push_frame(); }
-        else if (!nframes) start_dream();
-        else start_zoom();
+        else { if (!nframes) start_dream(); start_zoom(); }
     }
     y += bh + 4;
     int bw = (pw - 12 - 8) / 3, h2 = compact ? 22 : 26;
@@ -916,7 +913,7 @@ static void pick_page(void) {
                     char nm[32];
                     pick_name(&p, nm);
                     strcpy(status, nm);
-                    strcat(status, " is ready. Press Dream!");
+                    strcat(status, " is ready. Press Zoom!");
                     page = P_MAIN;
                 } else {
                     set_seed(&p);
@@ -992,14 +989,14 @@ static u32 rotate_keys(u32 k) {
 
 void generator_update(void) {
     u32 down = rotate_keys(plat_keys_down());
+    if (((down & K_R) && page == P_MAIN) || rotate_req) { rotate_req = false; toggle_view(); }
     // one unit of dreaming per update keeps the buttons responsive
     if (work == W_START) start_work_step();
     else if (work == W_ZOOM) zoom_work_step();
     if (page == P_MAIN) {
         if (down & K_A) {
             if (work != W_IDLE) { stop_req = true; if (work == W_START) work = W_IDLE; }
-            else if (!nframes) start_dream();
-            else start_zoom();
+            else { if (!nframes) start_dream(); start_zoom(); }
         }
         if ((down & K_B) && work == W_IDLE) {
             save_write();

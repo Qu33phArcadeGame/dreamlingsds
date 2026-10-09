@@ -166,10 +166,17 @@ static void draw_top(void) {
         for (int i = 0; i < nslot; i++) {
             int rx = reel_x(i);
             s_rect(s, rx, REEL_Y, REEL_W, REEL_H, COL(1, 0, 3));
-            int num = phase == E_READY ? slot[i].num : slot[i].show;
-            int tier = (slot[i].stopped || phase == E_READY) ? slot[i].tier : TIER_RED;
-            int wob = (!slot[i].stopped && phase == E_SPIN) ? (isin(spin_t * 330) * 5 >> 12) : 0;
-            draw_dreamling(s, num, tier, rx + REEL_W / 2, REEL_Y + REEL_H / 2 + wob, 64, 256);
+            if (phase == E_READY) {
+                // before the spin every reel is a mystery
+                int bobq = isin((int)frame_no * 8 + i * 300) * 3 >> 12;
+                int qw = text_w("?", 5);
+                s_text_sh(s, "?", rx + (REEL_W - qw) / 2, REEL_Y + REEL_H / 2 - 17 + bobq, COL8(201, 160, 255), 5);
+            } else {
+                int num = slot[i].show;
+                int tier = slot[i].stopped ? slot[i].tier : TIER_RED;
+                int wob = !slot[i].stopped ? (isin(spin_t * 330) * 5 >> 12) : 0;
+                draw_dreamling(s, num, tier, rx + REEL_W / 2, REEL_Y + REEL_H / 2 + wob, 64, 256);
+            }
             u16 bc = slot[i].stopped ? TIER_COLOR[slot[i].tier] : COL(11, 9, 15);
             s_box(s, rx, REEL_Y, REEL_W, REEL_H, bc);
             if (slot[i].stopped) s_box(s, rx + 1, REEL_Y + 1, REEL_W - 2, REEL_H - 2, bc);
@@ -205,8 +212,7 @@ static void draw_bottom(bool *tap_a, bool *tap_b) {
     s_text(s, A->name, 14, 24, COL8(138, 255, 234), 1);
     for (int i = 0; i < nslot; i++) {
         int x = (SCREEN_W - nslot * 78) / 2 + 4 + i * 78;
-        bool known = phase != E_SPIN || slot[i].stopped;
-        if (phase == E_GROW) known = false;
+        bool known = phase > E_SPIN || (phase == E_SPIN && slot[i].stopped);
         s_rect(s, x, 38, 70, 36, COL(1, 0, 3));
         if (known) {
             char nm[24];
