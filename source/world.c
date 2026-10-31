@@ -310,42 +310,6 @@ static int area_count(void) {
     return n;
 }
 
-/* --- DS diorama-lite (Oct 31, 2026) ---
-   This repo renders the world in software into S_TOP (fb_top), not
-   through the DS hardware 3D engine, so there is no MODE_0_3D switch
-   here and main.c is untouched. Instead each raised tile gets a
-   short front face: a darkened strip directly below its top face,
-   darker toward the bottom, like a box front seen straight-on.
-   Heights scale with TILE_SIZE: water lowest, solid walls mid,
-   trees tallest. Ground/path tiles get no front (height 0), so the
-   map stays readable and collision, camera and all gameplay are
-   unchanged. The strip pass runs after all tiles but before the
-   generator, Bob, player, companion and floaters, so characters
-   correctly draw in front of it. To turn the diorama off, delete
-   the single dio_draw_fronts() call in draw_world() below. */
-static int dio_front_h(int c, int r) {
-    if (gen_at(c, r)) return 0;
-    int id = M->tiles[r * M->cols + c];
-    int ov = M->over[r * M->cols + c];
-    if (tile_flags[id] & TILEF_WATER) return MAX(1, T / 8);
-    if ((tile_flags[id] & TILEF_TREE) || (ov != 255 && (tile_flags[ov] & TILEF_TREE))) return MAX(5, T / 2);
-    if (M->solid[r * M->cols + c]) return MAX(3, T / 3);
-    return 0;
-}
-static void dio_draw_fronts(Surf *s, int camx, int camy, int c0, int r0, int c1, int r1) {
-    for (int r = r0; r <= r1; r++)
-        for (int c = c0; c <= c1; c++) {
-            int h = dio_front_h(c, r);
-            if (!h) continue;
-            int dx = c * T - camx, dy = r * T - camy;
-            for (int y = 0; y < h; y++) {
-                int a = 60 + y * 150 / h;
-                if (a > 210) a = 210;
-                s_rect_blend(s, dx, dy + T + y, T, 1, COL(0, 0, 0), a);
-            }
-        }
-}
-
 static void draw_world(void) {
     Surf *s = &S_TOP;
     int camx = pxl + T / 2 - SCREEN_W / 2, camy = pyl + T / 2 - SCREEN_H / 2 - 4;
@@ -387,7 +351,6 @@ static void draw_world(void) {
                 s_rect_blend(s, dx, dy, T, T, COL8(150, 90, 255), a);
             }
         }
-    dio_draw_fronts(s, camx, camy, c0, r0, c1, r1);
     draw_generator(s, camx, camy);
     if (bob_here()) {
         int bx = BOB_X * T - camx, by = BOB_Y * T - camy + T - HERO_H + ((isin(t * 8) * 1) >> 12);
